@@ -404,17 +404,16 @@ func (p *Provider) RefreshTokenAvailable() bool {
 	return false
 }
 
-//GetSessionFromStore returns a session for a given a request and a response
-//This is an exaple of how you could get a session from a store - as long as you're
-//supplying a goth.Session to the interactors it will work though so feel free to use your
-//own method
+// GetSessionFromStore returns a session for a given a request and a response
+// This is an example of how you could get a session from a store - as long as you're
+// supplying a goth.Session to the interactors it will work though so feel free to use your
+// own method
 func (p *Provider) GetSessionFromStore(request *http.Request, response http.ResponseWriter) (goth.Session, error) {
-	sessionMarshalled, _ := gothic.Store.Get(request, "xero"+gothic.SessionName)
-	value := sessionMarshalled.Values["xero"]
-	if value == nil {
+	value, _ := gothic.GetFromSession("xero", request)
+	if value == "" {
 		return nil, errors.New("could not find a matching session for this request")
 	}
-	session, err := p.UnmarshalSession(value.(string))
+	session, err := p.UnmarshalSession(value)
 	if err != nil {
 		return nil, errors.New("could not unmarshal session for this request")
 	}
@@ -422,8 +421,7 @@ func (p *Provider) GetSessionFromStore(request *http.Request, response http.Resp
 	if sess.AccessTokenExpires.Before(time.Now().UTC().Add(5 * time.Minute)) {
 		if p.Method == "partner" {
 			p.RefreshOAuth1Token(sess)
-			sessionMarshalled.Values["xero"] = sess.Marshal()
-			err = sessionMarshalled.Save(request, response)
+			err = gothic.StoreInSession("xero", sess.Marshal(), request, response)
 			return session, err
 		}
 		return nil, errors.New("access token has expired - please reconnect")
